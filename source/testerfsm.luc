@@ -1,0 +1,382 @@
+module testerfsm (
+    input clk,
+    input rst,
+    input pause,          //for user to pause to check output
+    input restart,
+    output out[4][5]       //output 4 groups of 5bits to input for multi_seven_seg to display on IO shield
+  ) {
+
+
+
+
+  const CLKSPEED = 26;                             // speed of update for 26 is approx 1.34s    100MHz/2^26
+  dff counter[CLKSPEED](.clk(clk), .rst(rst));     // create counter as clk
+
+
+  alu alu;                           // instantiate alu for checking logic of program against predefined assertions
+  .clk(counter.q[CLKSPEED-1]){       // set fsm speed to counter
+  
+  //create an fsm for different states
+    fsm state(.rst(rst)) = {START, ADD, ADDOVERFLOW, SUB, AND, NAND, OR, NOR, XOR, XNOR, A, NOTA, NOTB, SHL, SHR, SRA, CMPEQ, CMPLT, CMPLE, MULTIPLY, ALUFNERROR, END}; // create states for testing each of the fsm.
+  }
+
+  always {
+    counter.d = counter.q + 1;       // to increment counter
+    
+    // Run through test cases
+    case(state.q){
+      state.START:                    //start state
+        alu.alufn_signal=0;
+        out = {5d0,5d0,5d0,5d0};
+        alu.a = 16b0;
+        alu.b = 16b0;
+        
+        if (restart == 1){ 
+          state.d = state.ADD;
+        }
+          
+      state.ADD: 
+      alu.alufn_signal = 6b0;
+      alu.a = 16b0000010111110010;             //1522
+      alu.b = 16b0001111010001101;             //7821
+      //out = 0010 0100 0111 1111              (9343)
+      if (alu.out == 16b0010010001111111){     //assertion set correct value for output of a op b
+          out = {5d10,5d13,5d13,5d30};         //shows Add --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};         //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.ADDOVERFLOW;         // move to next test case
+        }
+        
+      state.ADDOVERFLOW:
+      alu.alufn_signal = 6b0;
+      alu.a = 16b1000000000000001;               //-32767
+      alu.b = 16b1000000000000000;               //-32768
+      //out = 0000 0000 0000 0001                (-65535)
+      if (alu.out == 16b0000000000000001){       //assertion set correct value for output of a op b
+          out = {5d10,5d13,5d0,5d16};            //shows Ad0F --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};           //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.SUB;                   //move to next test case
+        }
+        
+      state.SUB:
+        alu.alufn_signal = 6b000001;             //OPCODE for subtraction
+        alu.a = 16b0000000000000100;             //4
+        alu.b = 16b0000000000000010;             //2
+        //out = 0000 0000 0000 0010              (2)
+        if (alu.out == 16b0000000000000010){     //subtraction of a and b should give 0
+          out = {5d22,5d23,5d11,5d30};           //shows sub --> pass case
+        }
+        else {
+          out = {5d14,5d21,5d21,5d30};           //shows Err --> fail case
+        }
+        if(pause == 0){
+          state.d = state.AND;                   //move to next test case
+        }
+        
+        
+      state.AND: 
+      alu.alufn_signal = 6b011000;
+      alu.a = 16b0011001001010000; 
+      alu.b = 16b0011000011101100; 
+      //out = 16b0011000001000000
+      if (alu.out == 16b0011000001000000){       // assertion set correct value for output of a op b
+          out = {5d10,5d19,5d13,5d30};           //shows And --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};           //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.NAND;                  //move to next test case
+        }
+      
+        
+      state.NAND:
+      alu.alufn_signal = 6b011001;
+      alu.a = 16b0011001001010000; 
+      alu.b = 16b0011000011101100; 
+      //out = 16b1100111110111111
+      if (alu.out == 16b1100111110111111){         // assertion set correct value for output of a op b
+          out = {5d19,5d10,5d19,5d13};             //shows nAnd --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};             //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.OR;                      //move to next test case
+        }
+        
+        
+      state.OR: 
+      alu.alufn_signal = 6b011110;
+      alu.a = 16b0011001001010000; 
+      alu.b = 16b0011000011101100; 
+      //out = 16b0011001011111100
+      if (alu.out == 16b0011001011111100){         //assertion set correct value for output of a op b
+          out = {5d0,5d21,5d30,5d30};              //shows 0r --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};             //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.NOR;                     //move to next test case
+        }
+      
+          
+        
+      state.NOR:
+      alu.alufn_signal = 6b011111;
+      alu.a = 16b0011001001010000; 
+      alu.b = 16b0011000011101100; 
+      //out = 16b1100110100000011
+      if (alu.out == 16b1100110100000011){       //assertion set correct value for output of a op b
+          out = {5d19,5d0,5d21,5d30};            //shows n0r --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};           //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.XOR;              //move to next test case
+        }
+            
+        
+      state.XOR:
+      alu.alufn_signal = 6b010110;
+      alu.a = 16b0011001001010000; 
+      alu.b = 16b0011000011101100; 
+      //out = 16b0000001010111100
+      if (alu.out == 16b0000001010111100){      //assertion set correct value for output of a op b
+          out = {5d22,5d0,5d21,5d30};           //shows S0r --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};          //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.XNOR;                 //move to next test case
+        }
+        
+        
+        
+      state.XNOR:
+      alu.alufn_signal = 6b010111;
+      alu.a = 16b0011001001010000; 
+      alu.b = 16b0011000011101100; 
+      //out = 16b1111110101000011
+      if (alu.out == 16b1111110101000011){     //assertion set correct value for output of a op b
+          out = {5d22,5d19,5d0,5d21};          //shows sn0r --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};         //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.A;                   //move to next test case
+        }
+          
+        
+      state.A:
+      alu.alufn_signal = 6b011010;
+      alu.a = 16b0011001001010000; 
+      alu.b = 16b0011000011101100; 
+      //out = 16b0011001001010000
+      if (alu.out == 16b0011001001010000){     //assertion set correct value for output of a op b
+          out = {5d10,5d30,5d30,5d30};         //shows A --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};         //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.NOTA;                //move to next test case
+        }
+        
+        
+      state.NOTA:
+      alu.alufn_signal = 6b011011;
+      alu.a = 16b0011001001010000; 
+      alu.b = 16b0011000011101100; 
+      //out = 16b1100110110101111
+      if (alu.out == 16b1100110110101111){     //assertion set correct value for output of a op b
+          out = {5d19,5d0,5d10,5d30};          //shows n0A --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};         //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.NOTB;                //move to next test case
+        }
+        
+        
+      state.NOTB:
+      alu.alufn_signal = 6b011101;
+      alu.a = 16b0011001001010000; 
+      alu.b = 16b0011000011101100; 
+      //out = 16b1100111100010011
+      if (alu.out == 16b1100111100010011){     //assertion set correct value for output of a op b
+          out = {5d19,5d0,5d11,5d30};          //shows n0b --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};         //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.SHL;                 //move to next test case
+        }
+        
+        
+      state.SHL: 
+      alu.alufn_signal = 6b101000;
+      alu.a = 16b0000000000000100;             //4
+      alu.b = 16b0000000000000010;             //2
+      //out = 16b0000000000010000              (16)
+      
+      if (alu.out == 16b0000000000010000){     //assertion set correct value for output of a op b
+          out = {5d22,5d17,5d18,5d30};         //shows shl --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};         //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.SHR;                 //move to next test case
+        }
+        
+        
+      state.SHR:
+      alu.alufn_signal = 6b101001;
+      alu.a = 16b0000000000000100;             //4
+      alu.b = 16b0000000000000010;             //2
+      //out = 16b0000000000000001              (16)
+      
+      if (alu.out == 16b0000000000000001){     //assertion set correct value for output of a op b
+          out = {5d22,5d17,5d21,5d30};         //shows shr --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};         //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.SRA;                 //move to next test case
+        }
+        
+      state.SRA:
+      alu.alufn_signal = 6b101011;
+      alu.a = 16b1000000000010000; 
+      alu.b = 16b0000000000000010;             //2
+      //out = 16b1110000000000100              (16)
+      
+      if (alu.out == 16b1110000000000100){     //assertion set correct value for output of a op b
+          out = {5d22,5d21,5d10,5d30};         //shows sra --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};         //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.CMPEQ;               //move to next test case
+        }
+        
+        
+      state.CMPEQ:
+      alu.alufn_signal = 6b110010;
+      alu.a = 16b0000000000000000; 
+      alu.b = 16b0000000000000000; 
+      //out = 16b0000000000000001  
+      
+      if (alu.out == 16b0000000000000001){     //assertion set correct value for output of a op b
+          out = {5d12,5d14,5d30,5d30};         //shows ce --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};         //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.CMPLT;               //move to next test case
+        }
+        
+        
+      //FALSE    
+      state.CMPLT:
+      alu.alufn_signal = 6b110100;
+      alu.a = 16b0000000001010000; 
+      alu.b = 16b0000000001010000; 
+      //out = 16b0000000000000000  
+      
+      if (alu.out == 16b0000000000000001){     //assertion set correct value for output of a op b
+          out = {5d12,5d18,5d22,5d30};         //shows cls --> pass case
+          }
+        else {
+          out = {5d19,5d12,5d18,5d22};         //shows ncls --> fail case
+          }
+        if(pause == 0){
+          state.d = state.CMPLE;               //move to next test case
+        }
+      
+        
+      //False case     
+      state.CMPLE:
+      alu.alufn_signal = 6b110110;
+      alu.a = 16b0010000000010000; 
+      alu.b = 16b0000010010000000; 
+      //out = 16b0000000000000000  
+      
+      if (alu.out == 16b0000000000000001){     //assertion set correct value for output of a op b
+          out = {5d12,5d18,5d14,5d30};         //shows cle --> pass case
+          }
+        else {
+          out = {5d19,5d0,5d18,5d14};          //shows n0lE --> fail case
+          }
+        if(pause == 0){
+          state.d = state.MULTIPLY;            //move to next test case
+        }
+              
+    
+      state.MULTIPLY: 
+      alu.alufn_signal = 6b000010;
+      alu.a = 16b0000000000000010; //2 
+      alu.b = 16b0000000000000100; //4
+      //out = 16b0000000000001000 (8)
+      if (alu.out == 16b0000000000001000){     //assertion set correct value for output of a op b
+          out = {5d19,5d19,5d23,5d18};         //shows nnUL --> pass case
+          }
+        else {
+          out = {5d14,5d21,5d21,5d30};         //shows Err --> fail case
+          }
+        if(pause == 0){
+          state.d = state.ALUFNERROR;                 //move to next test case
+        }
+        
+        
+      state.ALUFNERROR:
+      alu.alufn_signal = 6b001010;
+      alu.a = 16b0000000000000010;             //2 
+      alu.b = 16b0000000000000100;             //4
+      //out = 16b0000000000001000              (8)
+      if (alu.out == 16b0000000000001000){     //assertion set correct value for output of a op b
+          out = {5d10,5d13,5d13,5d30};         //shows Add --> pass case
+          }
+        else {
+          out = {5d10,5d16,5d19,5d14};         //shows AFnE --> fail case
+          }
+        if(pause == 0){
+          state.d = state.END;                 //move to next test case
+        }
+        
+
+        state.END:
+        out = {5d14,5d19,5d13,5d30};
+        alu.a =0;
+        alu.b=0;
+        alu.alufn_signal=0;
+        // press middle(1) button to reset the test from the top
+        if (restart == 1){ 
+          state.d = state.ADD;
+        }
+        
+        default: state.d = state.START;
+
+        out = {5d30,5d30,5d30,5d30};
+        alu.a =0;
+        alu.b=0;
+        alu.alufn_signal=0;
+    }
+}

@@ -1,0 +1,19 @@
+module compare (
+    input z,                      //input z
+    input v,                      //input v
+    input n,                      //input n
+    input alufn_signal[6],        //6 bits alufn input
+    output out[16]                //16 bits output
+  ) {
+
+  always {
+    out = 16b0;
+
+    case (alufn_signal[2:1]) {
+      default: out[0] = 0; 
+      b01: out[0] = z;               //a = b
+      b10: out[0] = n ^ v;           //a<b
+      b11: out[0] = z | (n ^ v);     //a<=b
+    }
+  }
+}

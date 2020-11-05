@@ -1,0 +1,230 @@
+module au_top (
+    input clk,              // 100MHz clock
+    input rst_n,            // reset button (active low)
+    output led [8],         // 8 user controllable LEDs
+    input usb_rx,           // USB->Serial input
+    output usb_tx,          // USB->Serial output
+    output io_led [3][8],   // LEDs on IO Shield
+    output io_seg [8],      // 7-segment LEDs on IO Shield
+    output io_sel [4],      // Digit select on IO Shield
+    input io_button [5],    // 5 buttons on IO Shield
+    input io_dip [3][8]     // DIP switches on IO Shield
+  ) {
+  
+  sig rst;                  // reset signal
+  
+  
+  .clk(clk) {
+    // The reset conditioner is used to synchronize the reset signal to the FPGA
+    // clock. This ensures the entire FPGA comes out of reset at the same time.
+    reset_conditioner reset_cond;
+    
+    .rst(rst) {
+      
+      dff ledsA[16];                                 //record input A 
+      dff ledsB[16];                                 //record input B 
+      dff store_alufn[6];                            //record alufn signal
+      fsm state = {START, INVALID, MANUAL, AUTO};    // all the different states
+      multi_seven_seg seg;
+    }
+    
+  }
+  
+  testerfsm autotest(.clk(clk), .rst(rst), .pause(io_dip[2][0]), .restart(io_button[1]));
+  
+  sig a[16];
+  sig b[16];
+  sig alufn[6];
+  sig alu[16];
+   
+  alu alumod;               //creating instance of alu
+  adder add;
+  
+  
+  always {
+    reset_cond.in = ~rst_n; // input raw inverted reset signal
+    rst = reset_cond.out;   // conditioned reset
+    
+    usb_tx = usb_rx; //loop serial port
+    
+    led = 8h00;             // turn LEDs off
+    
+    
+    io_led = 3x{{8h00}};    // turn LEDs off
+    io_seg = 8hff;          // turn segments off
+    io_sel = 4hf;           // select no digits
+    
+    seg.values = {5d0,5d0,5d0,5d0}; //initialising values of seven segment display
+    io_sel = ~4h0;
+    a = 8h0;                //initialising value of a
+    b = 8h0;                //initialising value of b
+    
+   
+    alufn = io_dip[0][7:2];         //assigning dip switches to alufn input
+    alumod.alufn_signal = alufn;    //connecting alufn to input of module alu
+    alumod.a = a;                   //connecting a to input of module alu
+    alumod.b = b;                   //connecting b to input of module alu
+    alu = alumod.out;               //connecting alu to output of module alu
+    add.a = ledsA.q;
+    add.b = ledsB.q;
+    add.alufn_signal = alufn;
+    io_led[0] = a[7:0];
+    io_led[1] = a[15:8];
+    io_led[0][6] = add.v;
+  
+      
+    case (state.q){                 
+     state.START:                    //define start state
+      
+        if(io_button[1] == 1){      //press middle(1) button to move to AUTO state
+           state.d = state.AUTO;
+        }
+        
+        if(io_dip[0][0]){           //if dip switch is up, change from auto testing to manual testing 
+            state.d = state.MANUAL;
+        }
+    
+    
+    
+    state.MANUAL:                   //define manual state
+    if(io_dip[0][1]){               //flip up switch[0][1] to set input a
+        a[7:0] = io_dip[1];
+        a[15:8] = io_dip[2];
+        if(io_button[3]){           //press left(3) button to store input a into a dff
+          ledsA.d = a;          
+        }
+    } else {                        //flip down switch[0][1]to set input b
+        b[7:0] = io_dip[1];
+        b[15:8] = io_dip[2];
+        if(io_button[4]){           //press right(4) button to store input b into a dff
+          ledsB.d = b;
+        }
+      }
+
+      alufn = io_dip[0][7:2];                       //assign dip switches to alufn input
+      if(io_button[2]){                             //press down(2) button to store input alufn into a dff
+
+        if (io_dip[0][7:2] == b000110){             //invalid alufn
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b001010){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b001110){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b010000){
+          	state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b010001){
+	          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b010010){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b010011){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b010100){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b010101){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b010110){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b010111){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b100000){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b100001){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b100010){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b100011){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b100100){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b100101){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b100110){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b100111){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b101010){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b101101){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b101110){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b101111){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b110000){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b110001){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b110011){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b110101){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b110111){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b111000){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b111001){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b111010){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b111011){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b111100){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b111101){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b111110){
+          state.d =state.INVALID;}
+        else if (io_dip[0][7:2] == b111111){
+          state.d =state.INVALID;}                    // end of invalid alufn
+              
+            
+        else{                                        // store alufn
+          store_alufn.d = alufn;
+        }    
+      }
+          
+      if(io_button[1]){             //press center(1) button to reset a,b,alufn
+        ledsA.d = 16b0;
+        ledsB.d = 16b0;
+        store_alufn.d = 6b0;}
+        
+      alumod.a = ledsA.q;                     //input stored value of a into module alu
+      alumod.b = ledsB.q;                     //input stored value of b into module alu
+      alumod.alufn_signal = store_alufn.q;    //input stored value of alufn into module alu
+      alu = alumod.out;                       //assigning alu to output of module alu
+      io_led[1] = alu[7:0];                   //display alu output on onboard leds
+      io_led[2] = alu[15:8];
+      io_led[0][0] = 1;
+      io_led[0][7] = alumod.zvn[0];          //z -leftmost
+      io_led[0][6] = alumod.zvn[1];          //v
+      io_led[0][5] = alumod.zvn[2];          //n
+      if(io_button[0]){                      //press up(0) button to return to initial state
+        state.d = state.START;}
+          
+
+        
+    state.INVALID:                           //define invalid state
+      alumod.alufn_signal = 000100;  
+      seg.values[3] = 5d14; //E 
+      seg.values[2] = 5d21; //r 
+      seg.values[1] = 5d21; //r 
+      io_seg = ~seg.seg;
+      io_sel = ~seg.sel;
+        
+      if(io_button[0]){              //press up(0) button to return to initial state
+        state.d = state.START;}
+          
+          
+        
+    state.AUTO:
+      seg.values[3] = 5d22; //S
+      seg.values[2] = 5d21; //r 
+      seg.values[1] = 5d0; //0
+      io_seg = ~seg.seg;
+      io_sel = ~seg.sel;
+      seg.values = autotest.out;
+        if(io_dip[0][0]){
+       state.d = state.MANUAL;
+      if(io_button[2]){
+        state.d = state.START;}
+  
